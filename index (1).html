@@ -1,0 +1,685 @@
+<!doctype html>
+<!--
+  ╔══════════════════════════════════════════════════════════════════╗
+  ║  TABLERO DE PRIVILEGIOS Y REFUERZO POSITIVO                      ║
+  ║  Sistema creado por la Profesora Patricia Ayelén Garnero         ║
+  ╚══════════════════════════════════════════════════════════════════╝
+
+  CONFIGURACIÓN (solo la primera vez). Más abajo, en el bloque <script>,
+  completá dos cosas:
+    1) firebaseConfig  → los datos de tu proyecto de Firebase.
+    2) ADMIN_EMAIL     → el correo con el que vas a iniciar sesión.
+  Mientras firebaseConfig tenga "PEGAR_AQUI", la página funciona en
+  MODO DEMOSTRACIÓN: los cambios quedan solo en tu navegador y la
+  contraseña de prueba es: demo
+
+  VARIOS CURSOS: el mismo archivo sirve para todos. Cada curso tiene
+  su propio enlace agregando ?curso=NOMBRE al final, por ejemplo:
+     https://tu-sitio.netlify.app/?curso=3a
+     https://tu-sitio.netlify.app/?curso=b1-medicina
+  Sin ?curso= se usa el tablero "general".
+
+  REGLAS DE SEGURIDAD de Firestore (Firebase → Firestore → Reglas):
+  ------------------------------------------------------------------
+  rules_version = '2';
+  service cloud.firestore {
+    match /databases/{database}/documents {
+      match /tableros/{curso} {
+        allow read: if true;
+        allow write: if request.auth != null
+                     && request.auth.uid == "PEGAR_TU_UID_AQUI";
+      }
+    }
+  }
+  ------------------------------------------------------------------
+-->
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="author" content="Profesora Patricia Ayelén Garnero">
+<title>Tablero de Privilegios</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,800&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#f5f1ea; --card:#ffffff; --ink:#1d2333; --muted:#666c7d; --line:#e6dfd4;
+    --navy:#1f2b47; --navy-2:#2e3d63;
+    --accent:#e2603f; --accent-soft:#fde9e2;
+    --teal:#2a9d8f; --teal-soft:#dff3f0;
+    --gold:#f2b134; --gold-2:#f7cf6b;
+    --danger:#c0392b;
+    --radius:18px; --shadow:0 6px 22px rgba(29,35,51,.08);
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0}
+  body{background:var(--bg);color:var(--ink);font-family:"Nunito",system-ui,sans-serif;line-height:1.5;-webkit-font-smoothing:antialiased}
+  body.admin{padding-bottom:96px}
+  .wrap{max-width:1040px;margin:0 auto;padding:0 16px}
+  h1,h2,h3{font-family:"Fraunces",Georgia,serif;line-height:1.15;margin:0}
+  button{font:inherit;cursor:pointer}
+  input,textarea{font:inherit;color:inherit}
+
+  /* Aviso demo / errores */
+  .banner{display:none;background:#fff4d6;color:#6b4e00;font-size:.92rem;text-align:center;padding:8px 16px;border-bottom:1px solid #f1dfa6}
+  .banner.show{display:block}
+  .banner.error{background:#fde3df;color:#7a1f13;border-color:#f3bdb4}
+
+  /* Encabezado */
+  header.hero{background:linear-gradient(135deg,var(--navy),var(--navy-2));color:#fff;padding:28px 0 72px;position:relative;overflow:hidden}
+  header.hero::after{content:"";position:absolute;right:-80px;top:-80px;width:260px;height:260px;border-radius:50%;background:rgba(242,177,52,.18)}
+  .hero-top{display:flex;justify-content:space-between;align-items:center;gap:12px;position:relative;z-index:1}
+  .kicker{text-transform:uppercase;letter-spacing:.14em;font-size:.74rem;font-weight:800;color:var(--gold-2)}
+  .lock{background:rgba(255,255,255,.12);color:#fff;border:1px solid rgba(255,255,255,.25);border-radius:999px;padding:7px 14px;font-size:.85rem;font-weight:700;display:flex;align-items:center;gap:6px}
+  .lock:hover{background:rgba(255,255,255,.2)}
+  .hero h1{font-size:clamp(1.9rem,5vw,3rem);margin-top:18px;position:relative;z-index:1}
+  .course{display:inline-block;margin-top:12px;background:var(--gold);color:var(--navy);font-weight:800;padding:4px 14px;border-radius:999px;font-size:.95rem;position:relative;z-index:1}
+  .author{margin-top:22px;position:relative;z-index:1;display:flex;align-items:center;gap:12px}
+  .author .badge{width:44px;height:44px;border-radius:50%;background:var(--accent);display:grid;place-items:center;font-family:"Fraunces",serif;font-weight:800;font-size:1.05rem;flex-shrink:0}
+  .author small{display:block;color:#c9d0e4;font-size:.8rem}
+  .author strong{font-family:"Fraunces",serif;font-size:clamp(1.1rem,3vw,1.35rem);font-weight:600}
+
+  main{margin-top:-48px;position:relative;z-index:2;display:grid;gap:22px;padding-bottom:28px}
+  .card{background:var(--card);border-radius:var(--radius);box-shadow:var(--shadow);padding:22px}
+  .section-title{display:flex;align-items:center;gap:10px;margin-bottom:16px}
+  .section-title h2{font-size:1.4rem}
+  .section-title .ico{width:36px;height:36px;border-radius:10px;display:grid;place-items:center;font-size:1.15rem}
+
+  /* Marcador */
+  .score{display:grid;grid-template-columns:auto 1fr;gap:22px;align-items:center}
+  .score-num{font-family:"Fraunces",serif;font-weight:800;font-size:clamp(3rem,10vw,4.6rem);line-height:1;color:var(--navy)}
+  .score-num span{font-size:.38em;color:var(--muted);font-weight:600}
+  .score-label{color:var(--muted);font-weight:700;font-size:.85rem;text-transform:uppercase;letter-spacing:.08em}
+  .bar{height:22px;background:#efe9df;border-radius:999px;overflow:hidden;margin:10px 0 8px}
+  .bar-fill{height:100%;width:0;background:linear-gradient(90deg,var(--gold),var(--accent));border-radius:999px;transition:width .7s cubic-bezier(.2,.8,.2,1)}
+  .score-msg{font-weight:700;color:var(--navy-2)}
+  .score.reached .bar-fill{background:linear-gradient(90deg,var(--teal),#5cc9a7)}
+  .score.reached .score-msg{color:var(--teal)}
+  @media (max-width:560px){.score{grid-template-columns:1fr;gap:6px}}
+
+  /* Acuerdos */
+  .rules{list-style:none;margin:0;padding:0;display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(240px,1fr))}
+  .rules li{display:flex;gap:14px;align-items:flex-start;background:var(--teal-soft);border-radius:14px;padding:16px}
+  .rules .n{flex-shrink:0;width:34px;height:34px;border-radius:50%;background:var(--teal);color:#fff;display:grid;place-items:center;font-family:"Fraunces",serif;font-weight:800}
+  .rules p{margin:3px 0 0;font-weight:600}
+
+  /* Privilegios */
+  .privs{display:grid;gap:14px;grid-template-columns:repeat(auto-fill,minmax(220px,1fr))}
+  .priv{border:2px solid var(--line);border-radius:16px;padding:16px;display:flex;flex-direction:column;gap:8px;background:#fffdfa;transition:transform .2s,border-color .2s}
+  .priv:hover{transform:translateY(-2px)}
+  .priv.ok{border-color:var(--gold)}
+  .priv .emoji{font-size:2rem;line-height:1}
+  .priv h3{font-size:1.1rem}
+  .priv p{margin:0;color:var(--muted);font-size:.93rem;flex:1}
+  .priv .foot{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap}
+  .cost{background:var(--accent-soft);color:var(--accent);font-weight:800;border-radius:999px;padding:3px 12px;font-size:.88rem}
+  .avail{font-size:.8rem;font-weight:800;color:#9a6a00}
+  .redeem{display:none;border:0;background:var(--navy);color:#fff;border-radius:10px;padding:7px 12px;font-weight:700;font-size:.85rem}
+  body.admin .redeem{display:inline-block}
+  .redeem:disabled{opacity:.4;cursor:not-allowed}
+  .empty{color:var(--muted);font-style:italic}
+
+  footer{text-align:center;color:var(--muted);font-size:.85rem;padding:12px 16px 32px}
+  footer strong{color:var(--ink)}
+
+  /* Panel de administración */
+  .admin-only{display:none}
+  body.admin .admin-only{display:block}
+  .panel{border:2px dashed var(--accent)}
+  .panel .grid{display:grid;gap:14px;grid-template-columns:repeat(auto-fit,minmax(200px,1fr))}
+  label{display:block;font-weight:700;font-size:.85rem;color:var(--muted);margin-bottom:4px}
+  .field{width:100%;border:1.5px solid var(--line);border-radius:10px;padding:9px 11px;background:#fff}
+  .field:focus{outline:none;border-color:var(--teal);box-shadow:0 0 0 3px var(--teal-soft)}
+  textarea.field{resize:vertical;min-height:44px}
+  .sub{margin:22px 0 10px;font-size:1.05rem}
+  .prow{display:grid;grid-template-columns:64px 1fr 90px 40px;gap:8px;align-items:start;padding:10px;border:1px solid var(--line);border-radius:12px;margin-bottom:8px;background:#fffdfa}
+  .prow .desc{grid-column:2 / 4}
+  .prow .del{grid-row:1 / 3;grid-column:4;border:0;background:#fde3df;color:var(--danger);border-radius:10px;height:40px;font-size:1.1rem}
+  .prow .emo{text-align:center;font-size:1.3rem}
+  @media (max-width:520px){
+    .prow{grid-template-columns:56px 1fr 40px}
+    .prow .costf{grid-column:2}
+    .prow .desc{grid-column:1 / 3}
+    .prow .del{grid-row:1;grid-column:3}
+  }
+  .btn{border:0;border-radius:10px;padding:9px 16px;font-weight:800}
+  .btn-ghost{background:var(--teal-soft);color:var(--teal)}
+  .btn-primary{background:var(--accent);color:#fff}
+  .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+  .row .field{flex:1;min-width:160px}
+  .hint{color:var(--muted);font-size:.85rem;margin:6px 0 0}
+
+  /* Barra fija de puntos */
+  .adminbar{display:none;position:fixed;left:0;right:0;bottom:0;z-index:20;background:var(--navy);color:#fff;padding:10px 12px calc(10px + env(safe-area-inset-bottom));box-shadow:0 -6px 20px rgba(0,0,0,.18)}
+  body.admin .adminbar{display:block}
+  .adminbar .inner{max-width:1040px;margin:0 auto;display:flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:center}
+  .pt{border:0;border-radius:12px;padding:10px 14px;font-weight:800;min-width:56px;font-size:1rem}
+  .pt.plus{background:var(--gold);color:var(--navy)}
+  .pt.minus{background:rgba(255,255,255,.14);color:#fff}
+  .status{font-size:.82rem;color:#c9d0e4;min-width:110px;text-align:center}
+  .status.err{color:#ffb4a6}
+
+  /* Diálogo de acceso */
+  dialog{border:0;border-radius:var(--radius);padding:0;width:min(92vw,380px);box-shadow:0 20px 60px rgba(0,0,0,.3)}
+  dialog::backdrop{background:rgba(20,26,40,.55)}
+  dialog form{padding:24px;display:grid;gap:12px}
+  dialog h2{font-size:1.35rem}
+  .err-msg{color:var(--danger);font-size:.88rem;min-height:1.2em;margin:0}
+
+  .toast{position:fixed;left:50%;top:16px;transform:translate(-50%,-150%);background:var(--navy);color:#fff;padding:10px 18px;border-radius:999px;font-weight:700;z-index:50;transition:transform .3s;font-size:.92rem;max-width:92vw;text-align:center}
+  .toast.show{transform:translate(-50%,0)}
+</style>
+</head>
+<body>
+
+<div id="banner" class="banner"></div>
+
+<header class="hero">
+  <div class="wrap">
+    <div class="hero-top">
+      <span class="kicker">Tablero de Privilegios y Refuerzo Positivo</span>
+      <button id="lockBtn" class="lock" type="button" aria-label="Acceso docente">🔒 <span>Docente</span></button>
+    </div>
+    <h1>¡Sumamos juntos!</h1>
+    <span id="courseName" class="course">Mi curso</span>
+    <div class="author">
+      <div class="badge" aria-hidden="true">PG</div>
+      <div>
+        <small>Sistema creado por</small>
+        <strong>Profesora Patricia Ayelén Garnero</strong>
+      </div>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+
+  <!-- Marcador de progreso -->
+  <section class="card" aria-labelledby="t-score">
+    <div class="section-title">
+      <div class="ico" style="background:#fff3d6">🏆</div>
+      <h2 id="t-score">Marcador del grupo</h2>
+    </div>
+    <div id="score" class="score">
+      <div>
+        <div class="score-label">Puntos</div>
+        <div class="score-num"><b id="points">0</b><span> / <span id="goal">100</span></span></div>
+      </div>
+      <div>
+        <div class="bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" id="bar"><div id="barFill" class="bar-fill"></div></div>
+        <div id="scoreMsg" class="score-msg"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Acuerdos -->
+  <section class="card" aria-labelledby="t-rules">
+    <div class="section-title">
+      <div class="ico" style="background:var(--teal-soft)">🤝</div>
+      <h2 id="t-rules">Nuestros acuerdos</h2>
+    </div>
+    <ol id="rules" class="rules"></ol>
+  </section>
+
+  <!-- Banco de privilegios -->
+  <section class="card" aria-labelledby="t-privs">
+    <div class="section-title">
+      <div class="ico" style="background:var(--accent-soft)">🎁</div>
+      <h2 id="t-privs">Banco de privilegios</h2>
+    </div>
+    <div id="privs" class="privs"></div>
+  </section>
+
+  <!-- Panel de edición (solo docente) -->
+  <section id="panel" class="card panel admin-only" aria-labelledby="t-panel">
+    <div class="section-title">
+      <div class="ico" style="background:var(--accent-soft)">✏️</div>
+      <h2 id="t-panel">Panel de edición</h2>
+    </div>
+    <p class="hint" style="margin-top:-8px">Los cambios se guardan solos y se ven al instante en el enlace público.</p>
+
+    <h3 class="sub">Datos del curso</h3>
+    <div class="grid">
+      <div><label for="f-curso">Nombre del curso</label><input id="f-curso" class="field" maxlength="60"></div>
+      <div><label for="f-puntos">Puntos actuales</label><input id="f-puntos" class="field" type="number" min="0" inputmode="numeric"></div>
+      <div><label for="f-meta">Meta</label><input id="f-meta" class="field" type="number" min="1" inputmode="numeric"></div>
+    </div>
+    <div style="margin-top:14px"><label for="f-mensaje">Mensaje al alcanzar la meta</label><input id="f-mensaje" class="field" maxlength="120"></div>
+
+    <h3 class="sub">Acuerdos de convivencia</h3>
+    <div class="grid">
+      <div><label for="f-r0">Acuerdo 1</label><textarea id="f-r0" class="field" rows="2" maxlength="160"></textarea></div>
+      <div><label for="f-r1">Acuerdo 2</label><textarea id="f-r1" class="field" rows="2" maxlength="160"></textarea></div>
+      <div><label for="f-r2">Acuerdo 3</label><textarea id="f-r2" class="field" rows="2" maxlength="160"></textarea></div>
+    </div>
+
+    <h3 class="sub">Privilegios</h3>
+    <div id="f-privs"></div>
+    <button id="addPriv" type="button" class="btn btn-ghost">+ Agregar privilegio</button>
+
+    <h3 class="sub">Enlaces y cursos</h3>
+    <label for="f-link">Enlace público de este curso</label>
+    <div class="row">
+      <input id="f-link" class="field" readonly>
+      <button id="copyLink" type="button" class="btn btn-ghost">Copiar</button>
+    </div>
+    <label for="f-otro" style="margin-top:12px">Abrir o crear otro curso (letras, números y guiones)</label>
+    <div class="row">
+      <input id="f-otro" class="field" placeholder="ej.: 3a, b1-medicina">
+      <button id="goCourse" type="button" class="btn btn-primary">Ir</button>
+    </div>
+    <p class="hint">Un curso nuevo empieza con los valores de ejemplo y se crea al hacer el primer cambio.</p>
+  </section>
+
+</main>
+
+<footer>
+  Tablero de Privilegios y Refuerzo Positivo · Sistema creado por <strong>Profesora Patricia Ayelén Garnero</strong><br>
+  <span id="updated"></span>
+</footer>
+
+<!-- Barra fija de puntos (solo docente) -->
+<div class="adminbar" role="toolbar" aria-label="Puntos">
+  <div class="inner">
+    <button class="pt minus" data-pts="-5" type="button">−5</button>
+    <button class="pt minus" data-pts="-1" type="button">−1</button>
+    <button class="pt plus" data-pts="1" type="button">+1</button>
+    <button class="pt plus" data-pts="5" type="button">+5</button>
+    <button class="pt plus" data-pts="10" type="button">+10</button>
+    <span id="status" class="status">Listo</span>
+    <button id="resetPts" class="pt minus" type="button" title="Volver a 0">↺ 0</button>
+  </div>
+</div>
+
+<!-- Inicio de sesión -->
+<dialog id="loginDlg">
+  <form id="loginForm" method="dialog">
+    <h2>Acceso docente</h2>
+    <div><label for="l-email">Correo</label><input id="l-email" class="field" type="email" autocomplete="username" required></div>
+    <div><label for="l-pass">Contraseña</label><input id="l-pass" class="field" type="password" autocomplete="current-password" required></div>
+    <p id="loginErr" class="err-msg"></p>
+    <div class="row" style="justify-content:flex-end">
+      <button type="button" id="cancelLogin" class="btn btn-ghost">Cancelar</button>
+      <button type="submit" class="btn btn-primary">Entrar</button>
+    </div>
+  </form>
+</dialog>
+
+<div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+<script type="module">
+/* ═══════════════ 1. CONFIGURACIÓN ═══════════════
+   Pegá acá los datos de Firebase (Configuración del proyecto →
+   Tus apps → SDK config). */
+const firebaseConfig = {
+  apiKey: "AIzaSyAJZvIVOSrGyPs4G5AiFl_m61IkytmXFYs",
+  authDomain: "awesome-ideas-c18b1.firebaseapp.com",
+  projectId: "awesome-ideas-c18b1",
+  storageBucket: "awesome-ideas-c18b1.firebasestorage.app",
+  messagingSenderId: "658861820601",
+  appId: "1:658861820601:web:26b4be7475caf8c6afa968"
+};
+/* El correo con el que vas a iniciar sesión: */
+const ADMIN_EMAIL = "miss.garnero@gmail.com";
+
+/* Valores iniciales de cada curso nuevo (también editables desde el panel) */
+const DEFAULTS = {
+  curso: "Mi curso",
+  puntos: 0,
+  meta: 100,
+  mensajeMeta: "¡Lo lograron! Meta alcanzada 🎉",
+  reglas: [
+    "Respetamos el turno para hablar y escuchamos a los demás.",
+    "Cuidamos los materiales, el aula y a nuestros compañeros.",
+    "Llegamos a tiempo y con lo necesario para trabajar."
+  ],
+  privilegios: [
+    { icono: "🪑", nombre: "Pase de Asiento Libre", descripcion: "Cada estudiante elige dónde sentarse durante una clase.", costo: 20 },
+    { icono: "🎵", nombre: "Pase de Música", descripcion: "Música tranquila durante el trabajo individual.", costo: 30 },
+    { icono: "📝", nombre: "Comodín de tarea", descripcion: "Una entrega con plazo extendido para todo el grupo.", costo: 50 },
+    { icono: "🎲", nombre: "Clase de juegos", descripcion: "Repasamos los contenidos jugando.", costo: 80 }
+  ]
+};
+/* ════════════════════════════════════════════════ */
+
+const DEMO = !firebaseConfig.apiKey || firebaseConfig.apiKey === "PEGAR_AQUI";
+const params = new URLSearchParams(location.search);
+const slug = s => String(s || "").toLowerCase().trim().replace(/\s+/g, "-").replace(/[^a-z0-9-]/g, "").slice(0, 40);
+const CURSO_ID = slug(params.get("curso")) || "general";
+
+const $ = s => document.querySelector(s);
+const clone = o => JSON.parse(JSON.stringify(o));
+function el(tag, cls, text) {
+  const e = document.createElement(tag);
+  if (cls) e.className = cls;
+  if (text != null) e.textContent = text;
+  return e;
+}
+
+/* ─── Almacenamiento: Firebase o demo local ─── */
+async function crearBackend() {
+  if (DEMO) {
+    const KEY = "tablero-demo-" + CURSO_ID;
+    let authCb = () => {};
+    let user = sessionStorage.getItem("demo-admin") ? { email: "demo" } : null;
+    return {
+      subscribe(cb) {
+        const load = () => {
+          try { const raw = localStorage.getItem(KEY); cb(raw ? JSON.parse(raw) : null); }
+          catch { cb(null); }
+        };
+        load();
+        addEventListener("storage", e => { if (e.key === KEY) load(); });
+      },
+      async save(d) { localStorage.setItem(KEY, JSON.stringify({ ...d, actualizado: Date.now() })); },
+      async login(_e, p) {
+        if (p !== "demo") throw { code: "auth/invalid-credential" };
+        user = { email: "demo" }; sessionStorage.setItem("demo-admin", "1"); authCb(user);
+      },
+      async logout() { user = null; sessionStorage.removeItem("demo-admin"); authCb(null); },
+      onAuth(cb) { authCb = cb; cb(user); },
+      isAdmin(u) { return !!u; }
+    };
+  }
+
+  const base = "https://www.gstatic.com/firebasejs/10.12.2/";
+  const [appMod, fsMod, authMod] = await Promise.all([
+    import(base + "firebase-app.js"),
+    import(base + "firebase-firestore.js"),
+    import(base + "firebase-auth.js")
+  ]);
+  const app = appMod.initializeApp(firebaseConfig);
+  const db = fsMod.getFirestore(app);
+  const auth = authMod.getAuth(app);
+  const ref = fsMod.doc(db, "tableros", CURSO_ID);
+
+  return {
+    subscribe(cb, errCb) {
+      fsMod.onSnapshot(ref, snap => {
+        if (!snap.exists()) return cb(null);
+        const d = snap.data({ serverTimestamps: "estimate" });
+        if (d.actualizado && d.actualizado.toMillis) d.actualizado = d.actualizado.toMillis();
+        cb(d);
+      }, errCb);
+    },
+    save(d) { return fsMod.setDoc(ref, { ...d, actualizado: fsMod.serverTimestamp() }); },
+    login(e, p) { return authMod.signInWithEmailAndPassword(auth, e, p); },
+    logout() { return authMod.signOut(auth); },
+    onAuth(cb) { authMod.onAuthStateChanged(auth, cb); },
+    isAdmin(u) { return !!u && (u.email || "").toLowerCase() === ADMIN_EMAIL.toLowerCase(); }
+  };
+}
+
+/* ─── Estado ─── */
+let data = clone(DEFAULTS);
+let admin = false;
+let backend;
+let saveTimer = null;
+
+function normalize(d) {
+  const x = { ...clone(DEFAULTS), ...(d || {}) };
+  x.curso = String(x.curso || "");
+  x.mensajeMeta = String(x.mensajeMeta || "");
+  x.puntos = Math.max(0, parseInt(x.puntos) || 0);
+  x.meta = Math.max(1, parseInt(x.meta) || 1);
+  x.reglas = (Array.isArray(x.reglas) ? x.reglas : []).slice(0, 3).map(String);
+  while (x.reglas.length < 3) x.reglas.push("");
+  x.privilegios = (Array.isArray(x.privilegios) ? x.privilegios : []).map(p => ({
+    icono: String(p.icono || "⭐"),
+    nombre: String(p.nombre || ""),
+    descripcion: String(p.descripcion || ""),
+    costo: Math.max(0, parseInt(p.costo) || 0)
+  }));
+  return x;
+}
+
+/* ─── Vista pública ─── */
+function renderPublic() {
+  $("#courseName").textContent = data.curso || "Mi curso";
+  document.title = "Tablero · " + (data.curso || "Mi curso");
+
+  const pct = Math.min(100, Math.round((data.puntos / data.meta) * 100));
+  const reached = data.puntos >= data.meta;
+  $("#points").textContent = data.puntos;
+  $("#goal").textContent = data.meta;
+  $("#barFill").style.width = pct + "%";
+  $("#bar").setAttribute("aria-valuenow", pct);
+  $("#score").classList.toggle("reached", reached);
+  const faltan = data.meta - data.puntos;
+  $("#scoreMsg").textContent = reached
+    ? data.mensajeMeta
+    : `¡Vamos! Faltan ${faltan} punto${faltan === 1 ? "" : "s"} para la meta (${pct}%).`;
+
+  const ol = $("#rules");
+  ol.replaceChildren();
+  data.reglas.forEach((r, i) => {
+    if (!r.trim() && !admin) return;
+    const li = el("li");
+    li.append(el("span", "n", i + 1), el("p", null, r || "(sin completar)"));
+    ol.append(li);
+  });
+
+  const grid = $("#privs");
+  grid.replaceChildren();
+  if (!data.privilegios.length) grid.append(el("p", "empty", "Todavía no hay privilegios cargados."));
+  data.privilegios.forEach((p, i) => {
+    const ok = data.puntos >= p.costo;
+    const card = el("article", "priv" + (ok ? " ok" : ""));
+    card.append(el("div", "emoji", p.icono), el("h3", null, p.nombre || "(sin nombre)"), el("p", null, p.descripcion));
+    const foot = el("div", "foot");
+    foot.append(el("span", "cost", p.costo + " pts"));
+    if (ok) foot.append(el("span", "avail", "⭐ ¡Al alcance!"));
+    const btn = el("button", "redeem", "Canjear");
+    btn.type = "button";
+    btn.disabled = !ok;
+    btn.addEventListener("click", () => canjear(i));
+    foot.append(btn);
+    card.append(foot);
+    grid.append(card);
+  });
+
+  $("#updated").textContent = data.actualizado
+    ? "Última actualización: " + new Date(data.actualizado).toLocaleString("es-AR", { dateStyle: "medium", timeStyle: "short" })
+    : "";
+}
+
+/* ─── Panel de edición ─── */
+function renderPanel() {
+  $("#f-curso").value = data.curso;
+  $("#f-puntos").value = data.puntos;
+  $("#f-meta").value = data.meta;
+  $("#f-mensaje").value = data.mensajeMeta;
+  data.reglas.forEach((r, i) => { $("#f-r" + i).value = r; });
+
+  const box = $("#f-privs");
+  box.replaceChildren();
+  data.privilegios.forEach((p, i) => {
+    const row = el("div", "prow");
+    row.dataset.i = i;
+    const mk = (k, cls, ph, type = "text") => {
+      const inp = el("input", "field " + cls);
+      inp.type = type; inp.dataset.k = k; inp.placeholder = ph; inp.value = p[k];
+      inp.setAttribute("aria-label", ph);
+      if (type === "number") { inp.min = 0; inp.inputMode = "numeric"; }
+      return inp;
+    };
+    const del = el("button", "del", "✕");
+    del.type = "button"; del.title = "Eliminar";
+    del.addEventListener("click", () => {
+      if (!confirm(`¿Eliminar "${p.nombre || "este privilegio"}"?`)) return;
+      data.privilegios.splice(i, 1);
+      renderPanel(); renderPublic(); scheduleSave();
+    });
+    row.append(mk("icono", "emo", "Emoji"), mk("nombre", "", "Nombre"), mk("costo", "costf", "Puntos", "number"), del, mk("descripcion", "desc", "Descripción breve"));
+    box.append(row);
+  });
+
+  const url = new URL(location.href);
+  url.search = CURSO_ID === "general" ? "" : "?curso=" + CURSO_ID;
+  url.hash = "";
+  $("#f-link").value = url.toString();
+}
+
+function readPanel() {
+  data.curso = $("#f-curso").value;
+  data.puntos = Math.max(0, parseInt($("#f-puntos").value) || 0);
+  data.meta = Math.max(1, parseInt($("#f-meta").value) || 1);
+  data.mensajeMeta = $("#f-mensaje").value;
+  data.reglas = [0, 1, 2].map(i => $("#f-r" + i).value);
+  data.privilegios = [...document.querySelectorAll("#f-privs .prow")].map(row => {
+    const g = k => row.querySelector(`[data-k="${k}"]`).value;
+    return { icono: g("icono") || "⭐", nombre: g("nombre"), descripcion: g("descripcion"), costo: Math.max(0, parseInt(g("costo")) || 0) };
+  });
+}
+
+/* ─── Guardado automático ─── */
+function setStatus(t, err = false) {
+  const s = $("#status");
+  s.textContent = t;
+  s.classList.toggle("err", err);
+}
+function scheduleSave(delay = 700) {
+  if (!admin) return;
+  setStatus("Guardando…");
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(async () => {
+    const { actualizado, ...payload } = data;
+    try {
+      await backend.save(payload);
+      setStatus("Guardado ✓");
+    } catch (e) {
+      console.error(e);
+      setStatus("Error al guardar", true);
+      toast("No se pudo guardar: revisá la conexión o los permisos.");
+    } finally {
+      saveTimer = null;
+    }
+  }, delay);
+}
+
+function ajustar(n) {
+  data.puntos = Math.max(0, data.puntos + n);
+  $("#f-puntos").value = data.puntos;
+  renderPublic();
+  scheduleSave(350);
+}
+function canjear(i) {
+  const p = data.privilegios[i];
+  if (!p || data.puntos < p.costo) return;
+  if (!confirm(`¿Canjear "${p.nombre}" por ${p.costo} puntos?`)) return;
+  ajustar(-p.costo);
+  toast(`🎉 Privilegio canjeado: ${p.nombre}`);
+}
+
+let toastT;
+function toast(msg) {
+  const t = $("#toast");
+  t.textContent = msg;
+  t.classList.add("show");
+  clearTimeout(toastT);
+  toastT = setTimeout(() => t.classList.remove("show"), 2800);
+}
+function banner(msg, error = false) {
+  const b = $("#banner");
+  b.textContent = msg;
+  b.classList.add("show");
+  b.classList.toggle("error", error);
+}
+
+/* ─── Eventos ─── */
+function bindUI() {
+  $("#panel").addEventListener("input", () => { readPanel(); renderPublic(); scheduleSave(); });
+
+  $("#addPriv").addEventListener("click", () => {
+    data.privilegios.push({ icono: "⭐", nombre: "Nuevo privilegio", descripcion: "", costo: 10 });
+    renderPanel(); renderPublic(); scheduleSave();
+    const rows = document.querySelectorAll("#f-privs .prow");
+    rows[rows.length - 1]?.querySelector('[data-k="nombre"]')?.select();
+  });
+
+  document.querySelectorAll("[data-pts]").forEach(b =>
+    b.addEventListener("click", () => ajustar(parseInt(b.dataset.pts))));
+
+  $("#resetPts").addEventListener("click", () => {
+    if (confirm("¿Volver el puntaje del grupo a 0?")) ajustar(-data.puntos);
+  });
+
+  $("#copyLink").addEventListener("click", async () => {
+    try { await navigator.clipboard.writeText($("#f-link").value); toast("Enlace copiado"); }
+    catch { $("#f-link").select(); }
+  });
+
+  $("#goCourse").addEventListener("click", () => {
+    const id = slug($("#f-otro").value);
+    if (!id) return toast("Escribí un nombre de curso válido.");
+    location.search = "?curso=" + id;
+  });
+
+  const dlg = $("#loginDlg");
+  $("#lockBtn").addEventListener("click", async () => {
+    if (admin) {
+      if (confirm("¿Cerrar sesión?")) await backend.logout();
+      return;
+    }
+    $("#loginErr").textContent = "";
+    if (DEMO) $("#l-email").value = "demo@demo.com";
+    dlg.showModal();
+  });
+  $("#cancelLogin").addEventListener("click", () => dlg.close());
+  $("#loginForm").addEventListener("submit", async ev => {
+    ev.preventDefault();
+    $("#loginErr").textContent = "Verificando…";
+    try {
+      await backend.login($("#l-email").value.trim(), $("#l-pass").value);
+      $("#l-pass").value = "";
+      dlg.close();
+    } catch (e) {
+      const c = e && e.code || "";
+      $("#loginErr").textContent =
+        c.includes("too-many-requests") ? "Demasiados intentos. Esperá unos minutos." :
+        c.includes("network") ? "Sin conexión. Probá de nuevo." :
+        "Correo o contraseña incorrectos.";
+    }
+  });
+}
+
+/* ─── Inicio ─── */
+(async function init() {
+  bindUI();
+  renderPublic();
+  if (DEMO) banner("Modo demostración: los cambios se guardan solo en este navegador. Contraseña de prueba: demo");
+
+  try {
+    backend = await crearBackend();
+  } catch (e) {
+    console.error(e);
+    banner("No se pudo conectar con el servidor. Revisá la conexión a internet.", true);
+    return;
+  }
+
+  backend.subscribe(d => {
+    if (saveTimer) return;               // hay cambios propios sin guardar: no pisarlos
+    data = normalize(d);
+    renderPublic();
+    if (admin && !$("#panel").contains(document.activeElement)) renderPanel();
+  }, err => {
+    console.error(err);
+    banner("No se pudo leer el tablero. Revisá las reglas de Firestore (lectura pública).", true);
+  });
+
+  backend.onAuth(u => {
+    admin = backend.isAdmin(u);
+    document.body.classList.toggle("admin", admin);
+    $("#lockBtn").innerHTML = admin ? "🔓 <span>Salir</span>" : "🔒 <span>Docente</span>";
+    if (u && !admin) {
+      toast("Esta cuenta no tiene permisos de edición.");
+      backend.logout();
+    }
+    if (admin) { renderPanel(); setStatus("Listo"); }
+    renderPublic();
+  });
+})();
+</script>
+</body>
+</html>
